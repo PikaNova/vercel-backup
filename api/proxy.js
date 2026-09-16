@@ -14,30 +14,10 @@ export default async function handler(req, res) {
       `https://${req.headers.host || "localhost"}`
     );
 
-    // 当前请求：
-    // /api/proxy/api/health
-    //
-    // 实际转发：
-    // https://exam.pikachu2026.space/api/health
-    //
-    // 如果以后使用 vercel.json 把 /api/* 映射到 proxy，
-    // 这里也可以直接处理实际路径。
-
-    let targetPath = requestUrl.pathname;
-
-    // 如果请求通过 /api/proxy/xxx 进入，则去掉 /api/proxy
-    if (targetPath.startsWith("/api/proxy")) {
-      targetPath = targetPath.slice("/api/proxy".length) || "/";
-    }
-
     const targetUrl = new URL(
-      targetPath + requestUrl.search,
+      requestUrl.pathname + requestUrl.search,
       origin
     );
-
-    // -----------------------------
-    // 请求头
-    // -----------------------------
 
     const headers = new Headers();
 
@@ -46,7 +26,6 @@ export default async function handler(req, res) {
 
       const lower = key.toLowerCase();
 
-      // 不把 Vercel / 客户端连接信息直接转发给源站
       if (
         [
           "host",
@@ -70,12 +49,7 @@ export default async function handler(req, res) {
       );
     }
 
-    // 告诉源站这是经过备用入口访问的
     headers.set("x-novora-backup", "vercel");
-
-    // -----------------------------
-    // 请求体
-    // -----------------------------
 
     let body;
 
@@ -91,9 +65,7 @@ export default async function handler(req, res) {
 
       if (Buffer.isBuffer(req.body)) {
         body = req.body;
-      } else if (
-        contentType.includes("application/json")
-      ) {
+      } else if (contentType.includes("application/json")) {
         body = JSON.stringify(req.body);
       } else if (
         contentType.includes(
@@ -108,9 +80,9 @@ export default async function handler(req, res) {
       }
     }
 
-    // -----------------------------
-    // 转发
-    // -----------------------------
+    console.log(
+      `[proxy] ${req.method} ${requestUrl.pathname}${requestUrl.search} -> ${targetUrl}`
+    );
 
     const response = await fetch(targetUrl, {
       method: req.method,
@@ -119,15 +91,7 @@ export default async function handler(req, res) {
       redirect: "manual",
     });
 
-    // -----------------------------
-    // 响应状态
-    // -----------------------------
-
     res.status(response.status);
-
-    // -----------------------------
-    // 响应头
-    // -----------------------------
 
     response.headers.forEach((value, key) => {
       const lower = key.toLowerCase();
@@ -143,20 +107,13 @@ export default async function handler(req, res) {
         return;
       }
 
-      // 源站如果返回 Location，
-      // 暂时保持原始地址，后面可以再做重定向处理。
       res.setHeader(key, value);
     });
 
-    // 防止备用入口产生缓存
     res.setHeader(
       "Cache-Control",
       "no-store, max-age=0"
     );
-
-    // -----------------------------
-    // 返回响应
-    // -----------------------------
 
     const data = Buffer.from(
       await response.arrayBuffer()
