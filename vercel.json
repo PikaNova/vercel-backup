@@ -4,6 +4,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://exam.pikachu2026.space/api/:path*"
+    },
+    {
+      "source": "/:path*",
+      "destination": "https://exam.pikachu2026.space/:path*"
     }
   ]
 }
