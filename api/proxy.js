@@ -7,55 +7,37 @@ export default async function handler(req, res) {
     });
   }
 
-  const requestUrl = new URL(req.url, `https://${req.headers.host}`);
-  const targetUrl = new URL(
-    requestUrl.pathname + requestUrl.search,
+  const url = new URL(req.url, `https://${req.headers.host}`);
+
+  const target = new URL(
+    url.pathname + url.search,
     origin
   );
 
-  // WebSocket 不通过这个 HTTP Proxy
-  if (
-    req.headers.upgrade &&
-    req.headers.upgrade.toLowerCase() === "websocket"
-  ) {
-    return res.status(426).json({
-      error: "WEBSOCKET_NOT_SUPPORTED_BY_BACKUP_PROXY"
-    });
-  }
+  try {
+    const headers = new Headers();
 
-  const headers = new Headers();
-
-  for (const [key, value] of Object.entries(req.headers)) {
-    if (
-      ![
-        "host",
-        "connection",
-        "content-length",
-        "transfer-encoding",
-        "upgrade"
-      ].includes(key.toLowerCase())
-    ) {
-      if (Array.isArray(value)) {
-        value.forEach(v => headers.append(key, v));
-      } else if (value != null) {
-        headers.set(key, value);
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (
+        ![
+          "host",
+          "connection",
+          "content-length",
+          "transfer-encoding",
+          "upgrade"
+        ].includes(key.toLowerCase()) &&
+        value
+      ) {
+        headers.set(
+          key,
+          Array.isArray(value) ? value.join(", ") : value
+        );
       }
     }
-  }
 
-  headers.set("host", targetUrl.host);
-
-  let body;
-
-  if (!["GET", "HEAD"].includes(req.method)) {
-    body = req.body;
-  }
-
-  try {
-    const response = await fetch(targetUrl, {
+    const response = await fetch(target, {
       method: req.method,
       headers,
-      body,
       redirect: "manual"
     });
 
@@ -74,15 +56,15 @@ export default async function handler(req, res) {
       }
     });
 
-    const buffer = Buffer.from(
+    const data = Buffer.from(
       await response.arrayBuffer()
     );
 
-    return res.send(buffer);
+    res.send(data);
   } catch (error) {
-    console.error("NOVORA_PROXY_ERROR", error);
+    console.error(error);
 
-    return res.status(502).json({
+    res.status(502).json({
       error: "NOVORA_ORIGIN_UNAVAILABLE"
     });
   }
