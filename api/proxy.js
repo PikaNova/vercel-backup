@@ -3,14 +3,18 @@ export default async function handler(req, res) {
 
   if (!origin) {
     return res.status(500).json({
+      ok: false,
       error: "NOVORA_ORIGIN_NOT_CONFIGURED"
     });
   }
 
-  const url = new URL(req.url, `https://${req.headers.host}`);
+  const requestUrl = new URL(
+    req.url,
+    `https://${req.headers.host}`
+  );
 
-  const target = new URL(
-    url.pathname + url.search,
+  const targetUrl = new URL(
+    requestUrl.pathname + requestUrl.search,
     origin
   );
 
@@ -19,23 +23,25 @@ export default async function handler(req, res) {
 
     for (const [key, value] of Object.entries(req.headers)) {
       if (
+        value &&
         ![
           "host",
           "connection",
           "content-length",
           "transfer-encoding",
           "upgrade"
-        ].includes(key.toLowerCase()) &&
-        value
+        ].includes(key.toLowerCase())
       ) {
         headers.set(
           key,
-          Array.isArray(value) ? value.join(", ") : value
+          Array.isArray(value)
+            ? value.join(", ")
+            : value
         );
       }
     }
 
-    const response = await fetch(target, {
+    const response = await fetch(targetUrl, {
       method: req.method,
       headers,
       redirect: "manual"
@@ -60,11 +66,12 @@ export default async function handler(req, res) {
       await response.arrayBuffer()
     );
 
-    res.send(data);
+    return res.send(data);
   } catch (error) {
     console.error(error);
 
-    res.status(502).json({
+    return res.status(502).json({
+      ok: false,
       error: "NOVORA_ORIGIN_UNAVAILABLE"
     });
   }
