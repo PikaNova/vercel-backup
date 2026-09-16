@@ -1,8 +1,9 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "/api/proxy?path=/:path*"
+      "destination": "https://exam.pikachu2026.space/api/:path*"
     }
   ]
 }
